@@ -294,7 +294,6 @@
 
     <div id="filters">
       <button class="filter-btn active" data-cat="tutti">Tutti</button>
-      <button class="filter-btn" data-cat="festival">Festival</button>
       <button class="filter-btn" data-cat="spazio">Spazi</button>
       <button class="filter-btn" data-cat="associazione">Associazioni</button>
       <button class="filter-btn" data-cat="istituzione">Istituzioni</button>
@@ -314,7 +313,7 @@ const entities = [
   {
     id: 1,
     name: "TERRAE Film Fest",
-    cat: "festival",
+    cat: "spazio",
     desc: "Festival audiovisivo dedicato al paesaggio, alla comunità e alle pratiche contemporanee di relazione con i luoghi. Programmazione internazionale con opere da oltre sessanta paesi.",
     lat: 42.0940, lng: 11.7955
   },
@@ -398,7 +397,6 @@ const entities = [
 ];
 
 const catColors = {
-  festival:      "#b85c38",
   spazio:        "#5b8a6e",
   associazione:  "#4a6fa5",
   istituzione:   "#7a5c8a",
@@ -406,7 +404,6 @@ const catColors = {
 };
 
 const catLabels = {
-  festival:      "Festival",
   spazio:        "Spazio",
   associazione:  "Associazione",
   istituzione:   "Istituzione",
@@ -463,8 +460,7 @@ entities.forEach(e => {
   item.dataset.cat = e.cat;
   item.innerHTML = `
     <div class="entity-cat" style="color:${color}">${catLabels[e.cat]}</div>
-    <div class="entity-name">${e.name}</div>
-    <div class="entity-desc">${e.desc}</div>`;
+    <div class="entity-name">${e.name}</div>`;
 
   item.addEventListener('click', () => {
     setActive(e.id);
