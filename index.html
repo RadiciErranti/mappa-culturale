@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Mappa Culturale — Civitavecchia</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<style>
+  :root {
+    --sand:       #f5f0e8;
+    --ink:        #1a1a18;
+    --terracotta: #b85c38;
+    --stone:      #8c8275;
+    --warm-white: #faf7f2;
+    --border:     rgba(0,0,0,0.13);
+    --sidebar-w:  340px;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  /* ── EMBED-READY: nessun overflow, nessun margine, trasparente ── */
+  html {
+    height: 100%;
+    overflow: hidden;
+    background: transparent;
+  }
+  body {
+    height: 100%;
+    font-family: 'DM Sans', sans-serif;
+    background: transparent;
+    color: var(--ink);
+    overflow: hidden;
+  }
+
+  #shell {
+    display: flex;
+    height: 100%;
+    width: 100%;
+    overflow: hidden;
+    background: transparent;
+  }
+
+  /* ─── SIDEBAR ─── */
+  #sidebar {
+    width: var(--sidebar-w);
+    min-width: var(--sidebar-w);
+    height: 100%;
+    background: transparent;
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    z-index: 10;
+  }
+
+  #sidebar-header {
+    padding: 26px 24px 20px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+
+  .label-small {
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--stone);
+    margin-bottom: 8px;
+  }
+
+  #sidebar-header h1 {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 24px;
+    font-weight: 300;
+    line-height: 1.2;
+    color: var(--ink);
+    margin-bottom: 7px;
+  }
+
+  #sidebar-header p {
+    font-size: 12px;
+    font-weight: 300;
+    color: var(--stone);
+    line-height: 1.55;
+  }
+
+  /* ─── FILTERS ─── */
+  #filters {
+    padding: 12px 24px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    flex-shrink: 0;
+  }
+
+  .filter-btn {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 10.5px;
+    font-weight: 400;
+    letter-spacing: 0.05em;
+    padding: 4px 11px;
+    border-radius: 20px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--stone);
+    cursor: pointer;
+    transition: all 0.16s ease;
+    white-space: nowrap;
+  }
+  .filter-btn:hover { border-color: var(--ink); color: var(--ink); }
+  .filter-btn.active { background: var(--ink); color: var(--warm-white); border-color: var(--ink); }
+
+  /* ─── COUNTER ─── */
+  #counter {
+    padding: 8px 24px;
+    font-size: 11px;
+    color: var(--stone);
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+    font-weight: 300;
+  }
+  #counter span { color: var(--ink); font-weight: 500; }
+
+  /* ─── ENTITY LIST ─── */
+  #entity-list {
+    overflow-y: auto;
+    flex: 1;
+    padding: 6px 0;
+  }
+
+  #entity-list::-webkit-scrollbar { width: 3px; }
+  #entity-list::-webkit-scrollbar-track { background: transparent; }
+  #entity-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+  .entity-item {
+    padding: 14px 24px;
+    cursor: pointer;
+    border-left: 3px solid transparent;
+    transition: all 0.15s ease;
+  }
+  .entity-item:hover { background: rgba(0,0,0,0.05); }
+  .entity-item.active {
+    background: rgba(0,0,0,0.05);
+    border-left-color: var(--terracotta);
+  }
+  .entity-item.hidden { display: none; }
+
+  .entity-cat {
+    font-size: 9.5px;
+    font-weight: 500;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+
+  .entity-name {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 16px;
+    font-weight: 400;
+    color: var(--ink);
+    margin-bottom: 4px;
+    line-height: 1.2;
+  }
+
+  .entity-desc {
+    font-size: 11.5px;
+    color: var(--stone);
+    line-height: 1.5;
+    font-weight: 300;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  /* ─── MAP ─── */
+  #map {
+    flex: 1;
+    height: 100%;
+    z-index: 1;
+  }
+
+  /* ─── LEAFLET OVERRIDES ─── */
+  .leaflet-popup-content-wrapper {
+    border-radius: 4px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.10);
+    padding: 0;
+    overflow: hidden;
+    border: 1px solid var(--border);
+    background: var(--warm-white);
+  }
+  .leaflet-popup-content {
+    margin: 0;
+    width: 240px !important;
+  }
+  .leaflet-popup-tip-container { display: none; }
+  .leaflet-popup-close-button {
+    top: 8px !important;
+    right: 8px !important;
+    color: var(--stone) !important;
+    font-size: 18px !important;
+    font-weight: 300 !important;
+  }
+
+  .popup-inner { padding: 18px 20px 16px; }
+  .popup-cat {
+    font-size: 9.5px;
+    font-weight: 500;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    margin-bottom: 5px;
+  }
+  .popup-name {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 19px;
+    font-weight: 400;
+    color: var(--ink);
+    margin-bottom: 7px;
+    line-height: 1.2;
+  }
+  .popup-desc {
+    font-size: 12px;
+    color: var(--stone);
+    line-height: 1.6;
+    font-weight: 300;
+  }
+
+  /* ─── CUSTOM MARKER ─── */
+  .custom-marker {
+    width: 13px;
+    height: 13px;
+    border-radius: 50%;
+    border: 2.5px solid #fff;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.22);
+    cursor: pointer;
+    transition: transform 0.18s ease;
+  }
+  .custom-marker:hover, .custom-marker.pulsing { transform: scale(1.5); }
+
+  /* ─── LEAFLET ZOOM ─── */
+  .leaflet-control-zoom {
+    border: 1px solid var(--border) !important;
+    border-radius: 4px !important;
+    overflow: hidden;
+  }
+  .leaflet-control-zoom a {
+    background: var(--warm-white) !important;
+    color: var(--ink) !important;
+    border-bottom: 1px solid var(--border) !important;
+    font-weight: 300 !important;
+  }
+  .leaflet-control-zoom a:hover { background: var(--sand) !important; }
+
+  /* ─── RESPONSIVE: sotto 600px impila verticalmente ─── */
+  @media (max-width: 600px) {
+    :root { --sidebar-w: 100%; }
+    #shell { flex-direction: column; }
+    #sidebar {
+      width: 100%;
+      min-width: 0;
+      height: 45%;
+      border-right: none;
+      border-bottom: 1px solid var(--border);
+    }
+    #map { height: 55%; }
+  }
+</style>
+</head>
+<body>
+
+<div id="shell">
+
+  <aside id="sidebar">
+    <div id="sidebar-header">
+      <p class="label-small">Mappa Culturale</p>
+      <h1>Civitavecchia</h1>
+      <p>Enti, spazi e realtà attive sul territorio. Seleziona un punto sulla mappa o un elemento dall'elenco.</p>
+    </div>
+
+    <div id="filters">
+      <button class="filter-btn active" data-cat="tutti">Tutti</button>
+      <button class="filter-btn" data-cat="festival">Festival</button>
+      <button class="filter-btn" data-cat="spazio">Spazi</button>
+      <button class="filter-btn" data-cat="associazione">Associazioni</button>
+      <button class="filter-btn" data-cat="istituzione">Istituzioni</button>
+      <button class="filter-btn" data-cat="patrimonio">Patrimonio</button>
+    </div>
+
+    <div id="counter"><span id="visible-count">0</span> realtà visualizzate</div>
+
+    <div id="entity-list"></div>
+  </aside>
+
+  <div id="map"></div>
+</div>
+
+<script>
+const entities = [
+  {
+    id: 1,
+    name: "TERRAE Film Fest",
+    cat: "festival",
+    desc: "Festival audiovisivo dedicato al paesaggio, alla comunità e alle pratiche contemporanee di relazione con i luoghi. Programmazione internazionale con opere da oltre sessanta paesi.",
+    lat: 42.0940, lng: 11.7955
+  },
+  {
+    id: 2,
+    name: "Fortezza Michelangelo",
+    cat: "patrimonio",
+    desc: "Fortezza rinascimentale progettata da Bramante, sede di eventi culturali e venue principale del TERRAE Film Fest. Uno dei monumenti più significativi di Civitavecchia.",
+    lat: 42.0925, lng: 11.7937
+  },
+  {
+    id: 3,
+    name: "Darsena Romana",
+    cat: "spazio",
+    desc: "Antico porto romano risalente all'epoca imperiale, adiacente alla banchina storica. Utilizzato come spazio per proiezioni e installazioni nel contesto del festival.",
+    lat: 42.0932, lng: 11.7961
+  },
+  {
+    id: 4,
+    name: "Museo Nazionale Archeologico",
+    cat: "istituzione",
+    desc: "Ospita reperti etruschi e romani provenienti dal territorio, tra cui materiali dalla Necropoli di Scaglia. Sede istituzionale di riferimento per la ricerca storica locale.",
+    lat: 42.0919, lng: 11.7995
+  },
+  {
+    id: 5,
+    name: "Radici Erranti ETS",
+    cat: "associazione",
+    desc: "Ente del Terzo Settore fondato nel 2025 a Civitavecchia. Promuove iniziative culturali, educative e partecipative che connettono il territorio, la memoria e le pratiche artistiche contemporanee.",
+    lat: 42.0936, lng: 11.8010
+  },
+  {
+    id: 6,
+    name: "Cinecircolo XXI CGS APS",
+    cat: "associazione",
+    desc: "Associazione di promozione sociale dedicata alla cultura cinematografica. Partner storico di TERRAE Film Fest nella promozione del cinema sul territorio.",
+    lat: 42.0927, lng: 11.8028
+  },
+  {
+    id: 7,
+    name: "CivitaviFilm ETS",
+    cat: "associazione",
+    desc: "Ente del Terzo Settore attivo nella produzione e promozione audiovisiva locale. Partner di TERRAE nel supporto alla filiera creativa del cinema a Civitavecchia.",
+    lat: 42.0952, lng: 11.8005
+  },
+  {
+    id: 8,
+    name: "Biblioteca Comunale",
+    cat: "istituzione",
+    desc: "Presidio culturale pubblico nel centro città. Conserva fondi storici locali e ospita eventi di divulgazione e incontri con autori.",
+    lat: 42.0908, lng: 11.7977
+  },
+  {
+    id: 9,
+    name: "Palazzo Gargana",
+    cat: "spazio",
+    desc: "Palazzo storico nel centro di Civitavecchia, identificato come spazio strategico per iniziative di rigenerazione culturale e residenze artistiche.",
+    lat: 42.0915, lng: 11.7968
+  },
+  {
+    id: 10,
+    name: "Associazione Amici del Fondo Ranalli ODV",
+    cat: "associazione",
+    desc: "Organizzazione di volontariato che tutela e valorizza il patrimonio del Fondo Ranalli. Partner operativo di Radici Erranti ETS per la presentazione di progetti sul territorio.",
+    lat: 42.0943, lng: 11.7985
+  },
+  {
+    id: 11,
+    name: "IMAGO Lab",
+    cat: "istituzione",
+    desc: "Laboratorio di ricerca e produzione visiva, supervisionato da Prof.ssa Mara Prezioso. Ente di riferimento per la formazione e la ricerca nell'ambito dell'immagine e del territorio.",
+    lat: 42.0960, lng: 11.7948
+  },
+  {
+    id: 12,
+    name: "Porto di Civitavecchia",
+    cat: "patrimonio",
+    desc: "Uno dei porti mercantili più antichi del Mediterraneo, fondato dall'imperatore Traiano. Elemento identitario centrale del paesaggio urbano e marino di Civitavecchia.",
+    lat: 42.0947, lng: 11.7920
+  }
+];
+
+const catColors = {
+  festival:      "#b85c38",
+  spazio:        "#5b8a6e",
+  associazione:  "#4a6fa5",
+  istituzione:   "#7a5c8a",
+  patrimonio:    "#c8a84b"
+};
+
+const catLabels = {
+  festival:      "Festival",
+  spazio:        "Spazio",
+  associazione:  "Associazione",
+  istituzione:   "Istituzione",
+  patrimonio:    "Patrimonio"
+};
+
+/* ── MAPPA ── */
+const map = L.map('map', {
+  center: [42.0935, 11.7975],
+  zoom: 14,
+  zoomControl: false,
+  attributionControl: false,
+  /* scrollWheelZoom disabilitato: evita conflitti con lo scroll
+     della pagina Readymag che contiene l'iframe             */
+  scrollWheelZoom: true
+});
+
+L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+  maxZoom: 19
+}).addTo(map);
+
+L.control.zoom({ position: 'bottomright' }).addTo(map);
+
+/* ── COSTRUZIONE ── */
+const markers = {};
+const listEl  = document.getElementById('entity-list');
+
+entities.forEach(e => {
+  const color = catColors[e.cat] || '#888';
+
+  const icon = L.divIcon({
+    className: '',
+    html: `<div class="custom-marker" style="background:${color}" data-id="${e.id}"></div>`,
+    iconSize: [13, 13],
+    iconAnchor: [6, 6],
+    popupAnchor: [0, -8]
+  });
+
+  const marker = L.marker([e.lat, e.lng], { icon }).addTo(map);
+
+  marker.bindPopup(`
+    <div class="popup-inner">
+      <div class="popup-cat" style="color:${color}">${catLabels[e.cat]}</div>
+      <div class="popup-name">${e.name}</div>
+      <div class="popup-desc">${e.desc}</div>
+    </div>`, { maxWidth: 260, minWidth: 220 });
+
+  marker.on('click', () => setActive(e.id));
+  markers[e.id] = marker;
+
+  const item = document.createElement('div');
+  item.className = 'entity-item';
+  item.dataset.id  = e.id;
+  item.dataset.cat = e.cat;
+  item.innerHTML = `
+    <div class="entity-cat" style="color:${color}">${catLabels[e.cat]}</div>
+    <div class="entity-name">${e.name}</div>
+    <div class="entity-desc">${e.desc}</div>`;
+
+  item.addEventListener('click', () => {
+    setActive(e.id);
+    map.setView([e.lat, e.lng], 16, { animate: true });
+    markers[e.id].openPopup();
+  });
+
+  listEl.appendChild(item);
+});
+
+updateCounter();
+
+/* ── ACTIVE ── */
+let currentActive = null;
+function setActive(id) {
+  if (currentActive !== null) {
+    document.querySelector(`.entity-item[data-id="${currentActive}"]`)?.classList.remove('active');
+    document.querySelector(`.custom-marker[data-id="${currentActive}"]`)?.classList.remove('pulsing');
+  }
+  currentActive = id;
+  const itemEl = document.querySelector(`.entity-item[data-id="${id}"]`);
+  if (itemEl) { itemEl.classList.add('active'); itemEl.scrollIntoView({ behavior:'smooth', block:'nearest' }); }
+  document.querySelector(`.custom-marker[data-id="${id}"]`)?.classList.add('pulsing');
+}
+
+/* ── FILTRI ── */
+document.querySelectorAll('.filter-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    const cat = btn.dataset.cat;
+    document.querySelectorAll('.entity-item').forEach(item => {
+      item.classList.toggle('hidden', !(cat === 'tutti' || item.dataset.cat === cat));
+    });
+    Object.entries(markers).forEach(([id, m]) => {
+      const entity = entities.find(e => e.id === parseInt(id));
+      const show   = cat === 'tutti' || entity.cat === cat;
+      show ? (map.hasLayer(m) || m.addTo(map)) : (map.hasLayer(m) && map.removeLayer(m));
+    });
+    updateCounter();
+  });
+});
+
+function updateCounter() {
+  document.getElementById('visible-count').textContent =
+    document.querySelectorAll('.entity-item:not(.hidden)').length;
+}
+
+/* ── FIX EMBED: invalida la dimensione mappa dopo il render
+   (risolve il classico problema Leaflet dentro iframe)      ── */
+window.addEventListener('load', () => {
+  setTimeout(() => map.invalidateSize(), 300);
+});
+</script>
+
+</body>
+</html>
